@@ -59,7 +59,7 @@ func main() {
 }
 
 type LoginRequestBody struct {
-	Username string `json:"username,omitempty" form:"username"`  //リクエストのBodyから構造体に上手いこと対応させてくれる
+	Username string `json:"username,omitempty" form:"username"`  //リクエストのBodyから構造体に上手いこと対応してることを教えてくれる
 	Password string `json:"password,omitempty" form:"password"`
 }  //ログイン情報の定義（リクエストにくっついてる、クライアントからくる）
 
@@ -68,9 +68,10 @@ type User struct {
 	HashedPass string `json:"-"  db:"HashedPass"`
 }  //ユーザー情報の定義（ログイン情報の検証に使う、DBから持ってくる）
 
+//returnのあとはfuncをぬける
 func postSignUpHandler(c echo.Context) error {
 	req := LoginRequestBody{}
-	c.Bind(&req)  //
+	c.Bind(&req)  //対応するリクエストのKeyの値を構造体にうまくあてはめてくれる
 
 	// もう少し真面目にバリデーションするべき（場合分けがなんとなくガバそう）
 	if req.Password == "" || req.Username == "" {
@@ -86,7 +87,7 @@ func postSignUpHandler(c echo.Context) error {
 	// 作ろうとしているUserNameが既存のものと重複していないかチェック
 	var count int
 
-	err = db.Get(&count, "SELECT COUNT(*) FROM users WHERE Username=?", req.Username)
+	err = db.Get(&count, "SELECT COUNT(*) FROM users WHERE Username=?", req.Username) //COUNT該当する行数を返す
 	if err != nil {
 		return c.String(http.StatusInternalServerError, fmt.Sprintf("db error: %v", err))
 	}
@@ -95,6 +96,7 @@ func postSignUpHandler(c echo.Context) error {
 		return c.String(http.StatusConflict, "ユーザーが既に存在しています")
 	}
 
+	//_=返り値が返ってくるけどいらないから明示的に捨てる
 	_, err = db.Exec("INSERT INTO users (Username, HashedPass) VALUES (?, ?)", req.Username, hashedPass)
 	if err != nil {
 		return c.String(http.StatusInternalServerError, fmt.Sprintf("db error: %v", err))
@@ -107,7 +109,7 @@ func postLoginHandler(c echo.Context) error {
 	c.Bind(&req)
 
 	user := User{}
-	err := db.Get(&user, "SELECT * FROM users WHERE username=?", req.Username)
+	err := db.Get(&user, "SELECT * FROM users WHERE username=?", req.Username)  //リクエストのUserがDBに存在するか問い合わせしていればその情報をUserにその情報を追加
 	if err != nil {
 		return c.String(http.StatusInternalServerError, fmt.Sprintf("db error: %v", err))
 	}
@@ -115,13 +117,13 @@ func postLoginHandler(c echo.Context) error {
 	err = bcrypt.CompareHashAndPassword([]byte(user.HashedPass), []byte(req.Password))
 	if err != nil {
 		if err == bcrypt.ErrMismatchedHashAndPassword {
-			return c.NoContent(http.StatusForbidden)
+			return c.NoContent(http.StatusForbidden)  //Passwordの不一致
 		} else {
 			return c.NoContent(http.StatusInternalServerError)
 		}
 	}
 
-	sess, err := session.Get("sessions", c)
+	sess, err := session.Get("sessions", c)  //session（サーバー側に存在する帳簿）にUserを登録
 	if err != nil {
 		fmt.Println(err)
 		return c.String(http.StatusInternalServerError, "something wrong in getting session")
@@ -132,9 +134,9 @@ func postLoginHandler(c echo.Context) error {
 	return c.NoContent(http.StatusOK)
 }
 
-func checkLogin(next echo.HandlerFunc) echo.HandlerFunc {
+func checkLogin(next echo.HandlerFunc) echo.HandlerFunc {  //middlewareと呼ばれるRequestとHandler関数をつなぐもの
 	return func(c echo.Context) error {
-		sess, err := session.Get("sessions", c)
+		sess, err := session.Get("sessions", c)  //sessionの取得（userNameがその中に存在しているかどうか？）
 		if err != nil {
 			fmt.Println(err)
 			return c.String(http.StatusInternalServerError, "something wrong in getting session")
@@ -150,9 +152,9 @@ func checkLogin(next echo.HandlerFunc) echo.HandlerFunc {
 }
 
 func getCityInfoHandler(c echo.Context) error {
-	cityName := c.Param("cityName")
+	cityName := c.Param("cityName")  //Parameterの読み取り
 
-	city := City{}
+	city := City{}  //cityという構造体を定義
 	db.Get(&city, "SELECT * FROM city WHERE Name=?", cityName)
 	if city.Name == "" {
 		return c.NoContent(http.StatusNotFound)
