@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 
+
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
 )
@@ -39,4 +40,7 @@ func main() {
 	for _, city := range cities {
 		fmt.Printf("都市名: %s, 人口: %d人\n", city.Name, city.Population)
 	}
+	db.MustExec(`INSERT INTO city (Name, CountryCode, District, Population) VALUES ('oookayama', 'JPN', 'Tokyo', 2147483647)`)
+
+
 }
