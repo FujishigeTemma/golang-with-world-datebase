@@ -54,8 +54,9 @@ func main() {
 	withLogin := e.Group("")  //
 	withLogin.Use(checkLogin)
 	withLogin.GET("/cities/:cityName", getCityInfoHandler)
+	withLogin.GET("/whoami", getWhoAmIHandler)
 
-	e.Start(":4000")
+	e.Start(":11600")
 }
 
 type LoginRequestBody struct {
@@ -161,4 +162,14 @@ func getCityInfoHandler(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, city)
+}
+
+type Me struct {
+	Username string `json:"username,omitempty"  db:"username"`
+}
+
+func getWhoAmIHandler(c echo.Context) error {
+	return c.JSON(http.StatusOK, Me{
+		Username: c.Get("userName").(string),
+	})
 }
