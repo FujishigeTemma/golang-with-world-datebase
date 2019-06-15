@@ -32,26 +32,26 @@ func main() {
 	_db, err := sqlx.Connect("mysql", fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8&parseTime=True&loc=Local", os.Getenv("DB_USERNAME"), os.Getenv("DB_PASSWORD"), os.Getenv("DB_HOSTNAME"), os.Getenv("DB_PORT"), os.Getenv("DB_DATABASE")))
 	if err != nil {
 		log.Fatalf("Cannot Connect to Database: %s", err)
-	}  //DataBaseに接続してる（エラーならその内容を表示）
-	db = _db  //func mainの外でも使えるように外で定義したdbに_dbを代入
+	} //DataBaseに接続してる（エラーならその内容を表示）
+	db = _db //func mainの外でも使えるように外で定義したdbに_dbを代入
 
 	store, err := mysqlstore.NewMySQLStoreFromConnection(db.DB, "sessions", "/", 60*60*24*14, []byte("secret-token"))
 	if err != nil {
 		panic(err)
-	}  //store, errを上手いことしてくれる　panic=実行をその時点で終了する
+	} //store, errを上手いことしてくれる　panic=実行をその時点で終了する
 
-	e := echo.New() //echoのインスタンス（echo＝サーバーに関するリクエストとかレスポンスとかの情報諸々を処理してくれるライブラリ）
-	e.Use(middleware.Logger())  //通行者のlogをとる
-	e.Use(session.Middleware(store))  //通行証の正当性を確認したのち、echo.Contextにその情報を追加
+	e := echo.New()                  //echoのインスタンス（echo＝サーバーに関するリクエストとかレスポンスとかの情報諸々を処理してくれるライブラリ）
+	e.Use(middleware.Logger())       //通行者のlogをとる
+	e.Use(session.Middleware(store)) //通行証の正当性を確認したのち、echo.Contextにその情報を追加
 
 	/*e.GET("/ping", func(c echo.Context) error {
 		return c.String(http.StatusOK, "pong")
-	})*/  //ピンポン
+	})*/ //ピンポン
 
 	e.POST("/signup", postSignUpHandler)
-	e.POST("/login", postLoginHandler)  //こいつらはボタンで分かれてる（ちなみにUseは上から順）
+	e.POST("/login", postLoginHandler) //こいつらはボタンで分かれてる（ちなみにUseは上から順）
 
-	withLogin := e.Group("")  //
+	withLogin := e.Group("") //
 	withLogin.Use(checkLogin)
 	withLogin.GET("/cities/:cityName", getCityInfoHandler)
 	withLogin.GET("/whoami", getWhoAmIHandler)
@@ -60,19 +60,19 @@ func main() {
 }
 
 type LoginRequestBody struct {
-	Username string `json:"username,omitempty" form:"username"`  //リクエストのBodyから構造体に上手いこと対応してることを教えてくれる
+	Username string `json:"username,omitempty" form:"username"` //リクエストのBodyから構造体に上手いこと対応してることを教えてくれる
 	Password string `json:"password,omitempty" form:"password"`
-}  //ログイン情報の定義（リクエストにくっついてる、クライアントからくる）
+} //ログイン情報の定義（リクエストにくっついてる、クライアントからくる）
 
 type User struct {
 	Username   string `json:"username,omitempty"  db:"Username"`
 	HashedPass string `json:"-"  db:"HashedPass"`
-}  //ユーザー情報の定義（ログイン情報の検証に使う、DBから持ってくる）
+} //ユーザー情報の定義（ログイン情報の検証に使う、DBから持ってくる）
 
 //returnのあとはfuncをぬける
 func postSignUpHandler(c echo.Context) error {
 	req := LoginRequestBody{}
-	c.Bind(&req)  //対応するリクエストのKeyの値を構造体にうまくあてはめてくれる
+	c.Bind(&req) //対応するリクエストのKeyの値を構造体にうまくあてはめてくれる
 
 	// もう少し真面目にバリデーションするべき（場合分けがなんとなくガバそう）
 	if req.Password == "" || req.Username == "" {
@@ -80,7 +80,7 @@ func postSignUpHandler(c echo.Context) error {
 		return c.String(http.StatusBadRequest, "項目が空です")
 	}
 
-	hashedPass, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)  //bcryptでpasswordをハッシュ化されたパスワードを生成
+	hashedPass, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost) //bcryptでpasswordをハッシュ化されたパスワードを生成
 	if err != nil {
 		return c.String(http.StatusInternalServerError, fmt.Sprintf("bcrypt generate error: %v", err))
 	}
@@ -110,7 +110,7 @@ func postLoginHandler(c echo.Context) error {
 	c.Bind(&req)
 
 	user := User{}
-	err := db.Get(&user, "SELECT * FROM users WHERE username=?", req.Username)  //リクエストのUserがDBに存在するか問い合わせしていればその情報をUserにその情報を追加
+	err := db.Get(&user, "SELECT * FROM users WHERE username=?", req.Username) //リクエストのUserがDBに存在するか問い合わせしていればその情報をUserにその情報を追加
 	if err != nil {
 		return c.String(http.StatusInternalServerError, fmt.Sprintf("db error: %v", err))
 	}
@@ -118,13 +118,13 @@ func postLoginHandler(c echo.Context) error {
 	err = bcrypt.CompareHashAndPassword([]byte(user.HashedPass), []byte(req.Password))
 	if err != nil {
 		if err == bcrypt.ErrMismatchedHashAndPassword {
-			return c.NoContent(http.StatusForbidden)  //Passwordの不一致
+			return c.NoContent(http.StatusForbidden) //Passwordの不一致
 		} else {
 			return c.NoContent(http.StatusInternalServerError)
 		}
 	}
 
-	sess, err := session.Get("sessions", c)  //session（サーバー側に存在する帳簿）にUserを登録
+	sess, err := session.Get("sessions", c) //session（サーバー側に存在する帳簿）にUserを登録
 	if err != nil {
 		fmt.Println(err)
 		return c.String(http.StatusInternalServerError, "something wrong in getting session")
@@ -135,9 +135,9 @@ func postLoginHandler(c echo.Context) error {
 	return c.NoContent(http.StatusOK)
 }
 
-func checkLogin(next echo.HandlerFunc) echo.HandlerFunc {  //middlewareと呼ばれるRequestとHandler関数をつなぐもの
+func checkLogin(next echo.HandlerFunc) echo.HandlerFunc { //middlewareと呼ばれるRequestとHandler関数をつなぐもの
 	return func(c echo.Context) error {
-		sess, err := session.Get("sessions", c)  //sessionの取得（userNameがその中に存在しているかどうか？）
+		sess, err := session.Get("sessions", c) //sessionの取得（userNameがその中に存在しているかどうか？）
 		if err != nil {
 			fmt.Println(err)
 			return c.String(http.StatusInternalServerError, "something wrong in getting session")
@@ -153,9 +153,9 @@ func checkLogin(next echo.HandlerFunc) echo.HandlerFunc {  //middlewareと呼ば
 }
 
 func getCityInfoHandler(c echo.Context) error {
-	cityName := c.Param("cityName")  //Parameterの読み取り
+	cityName := c.Param("cityName") //Parameterの読み取り
 
-	city := City{}  //cityという構造体を定義
+	city := City{} //cityという構造体を定義
 	db.Get(&city, "SELECT * FROM city WHERE Name=?", cityName)
 	if city.Name == "" {
 		return c.NoContent(http.StatusNotFound)
